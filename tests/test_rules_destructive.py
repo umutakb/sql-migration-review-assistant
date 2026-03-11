@@ -25,3 +25,29 @@ def test_delete_without_where_rule_detects_full_delete(default_config) -> None:
 
     assert len(issues) == 1
     assert issues[0].severity.value == "error"
+
+
+def test_delete_without_where_rule_ignores_delete_with_where(default_config) -> None:
+    migration = MigrationFile(
+        path="x.sql", relative_path="x.sql", content="DELETE FROM users WHERE id = 1;"
+    )
+    parse_migration_file(migration, "postgres")
+    rule = DeleteWithoutWhereRule()
+
+    issues = rule.check_statement(migration, migration.statements[0], default_config)
+
+    assert issues == []
+
+
+def test_delete_without_where_rule_ignores_where_in_comment(default_config) -> None:
+    migration = MigrationFile(
+        path="x.sql",
+        relative_path="x.sql",
+        content="DELETE FROM users -- WHERE id = 1\n;",
+    )
+    parse_migration_file(migration, "postgres")
+    rule = DeleteWithoutWhereRule()
+
+    issues = rule.check_statement(migration, migration.statements[0], default_config)
+
+    assert len(issues) == 1

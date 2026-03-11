@@ -43,6 +43,7 @@ First version is intentionally PostgreSQL-oriented:
 - Rule engine:
   - modular rule classes
   - config-driven enable/disable and severity overrides
+  - improved heuristics for `DELETE` without `WHERE`, rollback/description comments, and parse errors
 - Risk model:
   - severity (`error`, `warning`, `info`)
   - per-issue risk weight
@@ -50,8 +51,9 @@ First version is intentionally PostgreSQL-oriented:
   - final status (`pass`, `warning`, `fail`)
 - Reports:
   - Rich terminal output
+  - metadata + rule breakdown in terminal output
   - JSON report bundle
-  - static HTML report with summary cards and findings table
+  - static HTML report with cleaner empty states and metadata view
 
 ## Installation
 
@@ -85,6 +87,7 @@ Behavior:
 
 - non-zero exit (`1`) when final status is `fail`
 - parse failures are reported as issues (`safety.parse_error`)
+- CLI prints clearer hints for invalid input path / invalid config
 
 ## Configuration (`config.yaml`)
 
@@ -93,15 +96,22 @@ report_title: SQL Migration Review Report
 
 dialect: postgres
 
+# Rule state controls
 enabled_rules:
   destructive.drop_table: true
   performance.create_index_without_concurrently: true
   safety.rollback_comment_missing: true
+disabled_rules:
+  - schema.rename_drop_add_heuristic
 
+# Rule-level severity overrides
 severity_mapping:
   safety.transaction_safety: warning
   schema.rename_drop_add_heuristic: info
 
+# Fail behavior controls
+# You can set only fail_on, or full fail_threshold mapping.
+fail_on: error
 fail_threshold:
   severity: error
   risk_score: 25
@@ -112,10 +122,19 @@ risk_weights:
   severity.info: 1
   destructive.drop_table: 12
 
+# Path exclusion aliases:
+# ignored_paths / ignored_patterns / ignore_paths / exclude_patterns
 ignored_paths:
   - archive/*.sql
+exclude_patterns:
   - legacy/**/*.sql
 ```
+
+Fail status evaluation:
+
+- `fail` if issue severity reaches threshold (`error`, `warning`, or `info`)
+- `fail` if `total_risk_score >= fail_threshold.risk_score`
+- otherwise `warning` if any issues exist, else `pass`
 
 ## Rule Families
 
@@ -162,6 +181,7 @@ Includes:
 - total risk score
 - final status
 - top risky files
+- rule breakdown
 - top findings
 
 Example (shortened):

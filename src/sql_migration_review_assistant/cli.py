@@ -20,7 +20,10 @@ from .utils import write_example_files
 app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
-    help="SQL migration review assistant for risk detection and reporting.",
+    help=(
+        "Review SQL migration files, detect risky changes, and produce "
+        "terminal/JSON/HTML reports."
+    ),
 )
 console = Console()
 
@@ -32,34 +35,42 @@ class OutputFormat(StrEnum):
     ALL = "all"
 
 
+def _exit_with_error(message: str, hint: str | None = None, code: int = 2) -> None:
+    typer.secho(f"Error: {message}", fg=typer.colors.RED, err=True)
+    if hint:
+        typer.secho(f"Hint: {hint}", fg=typer.colors.YELLOW, err=True)
+    raise typer.Exit(code=code)
+
+
 @app.command("review")
 def review(
     migrations_path: Path = typer.Argument(
-        ..., help="SQL file or directory containing .sql files."
+        ...,
+        help="Path to a .sql file or directory containing .sql migration files.",
     ),
     format: OutputFormat = typer.Option(
         OutputFormat.TERMINAL,
         "--format",
         "-f",
-        help="Output format: terminal, json, html, or all.",
+        help="Report output: terminal, json, html, or all.",
         case_sensitive=False,
     ),
     output_dir: Path = typer.Option(
         Path("artifacts"),
         "--output-dir",
         "-o",
-        help="Output directory for generated reports.",
+        help="Directory where JSON/HTML reports will be written.",
     ),
     config_path: Path | None = typer.Option(
         None,
         "--config",
         "-c",
-        help="Path to config.yaml. Defaults to ./config.yaml if present.",
+        help="Path to config YAML. Defaults to ./config.yaml when present.",
     ),
     fail_on: Severity | None = typer.Option(
         None,
         "--fail-on",
-        help="Fail threshold override: error | warning | info.",
+        help="Override fail threshold severity: error | warning | info.",
         case_sensitive=False,
     ),
 ) -> None:
@@ -67,19 +78,36 @@ def review(
 
     try:
         config = load_config(config_path)
-    except (FileNotFoundError, ValueError) as exc:
-        raise typer.BadParameter(str(exc)) from exc
+    except FileNotFoundError as exc:
+        _exit_with_error(
+            str(exc),
+            "Provide a valid --config path or remove --config to use defaults.",
+        )
+    except ValueError as exc:
+        _exit_with_error(
+            str(exc),
+            "Fix config schema/types and retry. See README config example.",
+        )
 
     if fail_on is not None:
         config.fail_threshold.severity = fail_on
 
     try:
         sql_paths = collect_sql_paths(migrations_path, config.ignored_paths)
-    except (FileNotFoundError, ValueError) as exc:
-        raise typer.BadParameter(str(exc)) from exc
+    except FileNotFoundError as exc:
+        _exit_with_error(str(exc), "Provide an existing .sql file or directory path.")
+    except ValueError as exc:
+        _exit_with_error(
+            str(exc),
+            "Input must be a .sql file or a directory containing .sql files.",
+        )
 
     if not sql_paths:
-        typer.secho("No SQL files found for analysis.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "No SQL files found for analysis after applying ignore/exclude patterns.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     root = migrations_path if migrations_path.is_dir() else migrations_path.parent
@@ -88,9 +116,18 @@ def review(
 
     engine = ReviewEngine()
     bundle = engine.review(migrations, config=config, input_path=str(migrations_path))
+    parse_error_count = sum(1 for issue in bundle.issues if issue.rule_id == "safety.parse_error")
 
     if format in {OutputFormat.TERMINAL, OutputFormat.ALL}:
         render_terminal_report(bundle, report_title=config.report_title, console=console)
+
+    if parse_error_count:
+        typer.secho(
+            f"Warning: {parse_error_count} statement(s) could not be parsed "
+            "and were reported as safety.parse_error.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
 
     generated: list[Path] = []
     if format in {OutputFormat.JSON, OutputFormat.ALL}:

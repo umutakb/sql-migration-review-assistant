@@ -17,6 +17,13 @@ def _bundle_from_fixture(fixture_dir: Path, default_config):
     return ReviewEngine().review(migrations, default_config, input_path="fixtures/risky.sql")
 
 
+def _safe_bundle_from_fixture(fixture_dir: Path, default_config):
+    paths = [fixture_dir / "safe.sql"]
+    migrations = load_migration_files(paths, root=fixture_dir)
+    parse_migrations(migrations, "postgres")
+    return ReviewEngine().review(migrations, default_config, input_path="fixtures/safe.sql")
+
+
 def test_json_report_generation(tmp_path: Path, fixture_dir: Path, default_config) -> None:
     bundle = _bundle_from_fixture(fixture_dir, default_config)
 
@@ -36,3 +43,17 @@ def test_html_report_generation(tmp_path: Path, fixture_dir: Path, default_confi
     html = report_path.read_text(encoding="utf-8")
     assert "SQL Migration Review Report" in html
     assert "Detailed Findings" in html
+
+
+def test_report_empty_state_generation(tmp_path: Path, fixture_dir: Path, default_config) -> None:
+    bundle = _safe_bundle_from_fixture(fixture_dir, default_config)
+
+    json_path = write_json_report(bundle, tmp_path, filename="safe-report.json")
+    html_path = write_html_report(bundle, tmp_path, filename="safe-report.html")
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    html = html_path.read_text(encoding="utf-8")
+
+    assert payload["summary"]["total_issues"] == 0
+    assert payload["status"] == "pass"
+    assert "No findings detected." in html

@@ -133,7 +133,8 @@
       <div class="meta">
         Input: <strong>{{ bundle.input_path }}</strong><br>
         Generated: {{ bundle.generated_at }}<br>
-        Tool Version: {{ bundle.tool_version }}
+        Tool Version: {{ bundle.tool_version }}<br>
+        Status: <strong class="status-{{ bundle.status.value }}">{{ bundle.status.value|upper }}</strong>
       </div>
 
       <div class="cards">
@@ -181,17 +182,23 @@
           </tr>
         </thead>
         <tbody>
-          {% for file in bundle.file_summaries %}
-          <tr>
-            <td>{{ file.file_path }}</td>
-            <td>{{ file.statements }}</td>
-            <td>{{ file.issues }}</td>
-            <td class="sev-error">{{ file.errors }}</td>
-            <td class="sev-warning">{{ file.warnings }}</td>
-            <td class="sev-info">{{ file.info }}</td>
-            <td>{{ '%.2f'|format(file.risk_score) }}</td>
-          </tr>
-          {% endfor %}
+          {% if bundle.file_summaries %}
+            {% for file in bundle.file_summaries %}
+            <tr>
+              <td>{{ file.file_path }}</td>
+              <td>{{ file.statements }}</td>
+              <td>{{ file.issues }}</td>
+              <td class="sev-error">{{ file.errors }}</td>
+              <td class="sev-warning">{{ file.warnings }}</td>
+              <td class="sev-info">{{ file.info }}</td>
+              <td>{{ '%.2f'|format(file.risk_score) }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="7">No files scanned.</td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </section>
@@ -210,16 +217,22 @@
           </tr>
         </thead>
         <tbody>
-          {% for issue in bundle.issues %}
-          <tr>
-            <td class="sev-{{ issue.severity.value }}">{{ issue.severity.value|upper }}</td>
-            <td>{{ issue.rule_id }}</td>
-            <td>{{ issue.file_path }}</td>
-            <td>{{ issue.statement_index if issue.statement_index is not none else '-' }}</td>
-            <td>{{ '%.2f'|format(issue.weight) }}</td>
-            <td>{{ issue.message }}</td>
-          </tr>
-          {% endfor %}
+          {% if bundle.issues %}
+            {% for issue in bundle.issues %}
+            <tr>
+              <td class="sev-{{ issue.severity.value }}">{{ issue.severity.value|upper }}</td>
+              <td>{{ issue.rule_id }}</td>
+              <td>{{ issue.file_path }}</td>
+              <td>{{ issue.statement_index if issue.statement_index is not none else '-' }}</td>
+              <td>{{ '%.2f'|format(issue.weight) }}</td>
+              <td>{{ issue.message }}</td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6">No findings detected.</td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </section>

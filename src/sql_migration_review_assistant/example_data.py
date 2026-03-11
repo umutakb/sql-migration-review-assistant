@@ -28,8 +28,11 @@ dialect: postgres
 enabled_rules:
   safety.description_comment_missing: true
   safety.rollback_comment_missing: true
+disabled_rules:
+  - schema.rename_drop_add_heuristic
 severity_mapping:
   safety.transaction_safety: warning
+fail_on: error
 fail_threshold:
   severity: error
   risk_score: 20
@@ -39,5 +42,7 @@ risk_weights:
   severity.info: 1
 ignored_paths:
   - archive/*.sql
+exclude_patterns:
+  - legacy/**/*.sql
 """,
 }

@@ -4,12 +4,28 @@ from __future__ import annotations
 
 import re
 
+from sqlglot import exp
+
 from ..models import MigrationFile, ReviewIssue, Severity, StatementInfo, ToolConfig
 from .base import Rule
+
+_COMMENT_RE = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
+_STRING_RE = re.compile(r"'(?:''|[^'])*'")
 
 
 def _normalize(sql: str) -> str:
     return " ".join(sql.upper().split())
+
+
+def _delete_has_where(statement: StatementInfo) -> bool:
+    ast = statement.ast
+    if isinstance(ast, exp.Delete):
+        return ast.args.get("where") is not None
+
+    sanitized = _COMMENT_RE.sub(" ", statement.raw_sql)
+    sanitized = _STRING_RE.sub("''", sanitized)
+    normalized = _normalize(sanitized)
+    return " WHERE " in f" {normalized} "
 
 
 class DropTableRule(Rule):
@@ -22,7 +38,7 @@ class DropTableRule(Rule):
     def check_statement(
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
-        sql = _normalize(statement.raw_sql)
+        sql = _normalize(_COMMENT_RE.sub(" ", statement.raw_sql))
         if re.match(r"^DROP TABLE\b", sql):
             return [
                 self.issue(
@@ -45,7 +61,7 @@ class DropColumnRule(Rule):
     def check_statement(
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
-        sql = _normalize(statement.raw_sql)
+        sql = _normalize(_COMMENT_RE.sub(" ", statement.raw_sql))
         if "DROP COLUMN" in sql:
             return [
                 self.issue(
@@ -68,7 +84,7 @@ class TruncateRule(Rule):
     def check_statement(
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
-        sql = _normalize(statement.raw_sql)
+        sql = _normalize(_COMMENT_RE.sub(" ", statement.raw_sql))
         if re.match(r"^TRUNCATE\b", sql):
             return [
                 self.issue(
@@ -94,14 +110,17 @@ class DeleteWithoutWhereRule(Rule):
     def check_statement(
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
-        sql = _normalize(statement.raw_sql)
-        if re.match(r"^DELETE FROM\b", sql) and " WHERE " not in f" {sql} ":
+        sql = _normalize(_COMMENT_RE.sub(" ", statement.raw_sql))
+        if re.match(r"^DELETE\b", sql) and not _delete_has_where(statement):
             return [
                 self.issue(
                     file=file,
                     statement=statement,
                     config=config,
-                    message="DELETE without WHERE may remove all rows in the target table.",
+                    message=(
+                        "DELETE statement has no WHERE predicate. "
+                        "This can remove all rows in the target table."
+                    ),
                 )
             ]
         return []
@@ -117,7 +136,7 @@ class IrreversibleOperationRule(Rule):
     def check_statement(
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
-        sql = _normalize(statement.raw_sql)
+        sql = _normalize(_COMMENT_RE.sub(" ", statement.raw_sql))
         irreversible_patterns = (
             r"^DROP TABLE\b",
             r"DROP COLUMN",

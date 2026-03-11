@@ -80,18 +80,37 @@ class NotNullWithoutDefaultRule(Rule):
         self, file: MigrationFile, statement: StatementInfo, config: ToolConfig
     ) -> list[ReviewIssue]:
         sql = _normalize(statement.raw_sql)
-        add_col_not_null = re.search(r"\bADD COLUMN\b.*\bNOT NULL\b", sql)
-        has_default = re.search(r"\bDEFAULT\b", sql)
+        if not re.search(r"\bALTER TABLE\b", sql):
+            return []
 
-        if re.search(r"\bALTER TABLE\b", sql) and add_col_not_null and not has_default:
+        add_col_not_null = re.search(r"\bADD COLUMN\b.*\bNOT NULL\b", sql)
+        if not add_col_not_null:
+            return []
+
+        has_default = re.search(r"\bDEFAULT\b", sql)
+        default_is_null = re.search(r"\bDEFAULT\s+NULL\b", sql)
+        has_identity_like_generation = re.search(r"\b(GENERATED|IDENTITY)\b", sql)
+        has_serial_type = re.search(r"\b(SMALLSERIAL|SERIAL|BIGSERIAL)\b", sql)
+
+        # Identity/serial columns are typically auto-populated and should not be
+        # flagged by the "missing default" heuristic.
+        if has_identity_like_generation or has_serial_type:
+            return []
+
+        if not has_default or default_is_null:
+            reason = "DEFAULT is NULL" if default_is_null else "no DEFAULT is provided"
             return [
                 self.issue(
                     file=file,
                     statement=statement,
                     config=config,
-                    message="Adding NOT NULL column without DEFAULT may fail for existing rows.",
+                    message=(
+                        "Adding a NOT NULL column where "
+                        f"{reason}. Existing rows may violate the constraint."
+                    ),
                 )
             ]
+
         return []
 
 

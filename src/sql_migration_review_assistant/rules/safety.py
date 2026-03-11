@@ -7,9 +7,44 @@ import re
 from ..models import MigrationFile, ReviewIssue, Severity, StatementInfo, ToolConfig
 from .base import Rule
 
+_LINE_COMMENT_RE = re.compile(r"^\s*--\s?(.*)$")
+_BLOCK_COMMENT_RE = re.compile(r"/\*(.*?)\*/", re.DOTALL)
+_ROLLBACK_HINT_RE = re.compile(r"\b(roll\s?back|rollback|down migration|revert|undo)\b")
+
 
 def _normalize(sql: str) -> str:
     return " ".join(sql.upper().split())
+
+
+def _extract_comments(content: str) -> list[str]:
+    comments: list[str] = []
+
+    for line in content.splitlines():
+        match = _LINE_COMMENT_RE.match(line)
+        if match:
+            comments.append(match.group(1).strip())
+
+    for match in _BLOCK_COMMENT_RE.finditer(content):
+        comments.append(match.group(1).strip())
+
+    return comments
+
+
+def _has_intro_comment(content: str, lookahead_non_empty_lines: int = 5) -> bool:
+    non_empty_seen = 0
+    for line in content.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        non_empty_seen += 1
+        if stripped.startswith("--") or stripped.startswith("/*"):
+            return True
+
+        if non_empty_seen >= lookahead_non_empty_lines:
+            return False
+
+    return False
 
 
 class RollbackCommentMissingRule(Rule):
@@ -20,15 +55,18 @@ class RollbackCommentMissingRule(Rule):
     default_weight = 2.0
 
     def check_file(self, file: MigrationFile, config: ToolConfig) -> list[ReviewIssue]:
-        lowered = file.content.lower()
-        if any(token in lowered for token in ("rollback", "down migration", "revert")):
+        comments = _extract_comments(file.content)
+        if any(_ROLLBACK_HINT_RE.search(comment.lower()) for comment in comments):
             return []
 
         return [
             self.issue(
                 file=file,
                 config=config,
-                message="Migration comment does not include rollback/down guidance.",
+                message=(
+                    "No rollback note found in migration comments. "
+                    "Add a short down/rollback strategy for safer reviews."
+                ),
             )
         ]
 
@@ -41,23 +79,17 @@ class DescriptionCommentMissingRule(Rule):
     default_weight = 1.0
 
     def check_file(self, file: MigrationFile, config: ToolConfig) -> list[ReviewIssue]:
-        first_non_empty: str | None = None
-        for line in file.content.splitlines():
-            stripped = line.strip()
-            if stripped:
-                first_non_empty = stripped
-                break
-
-        if first_non_empty and (
-            first_non_empty.startswith("--") or first_non_empty.startswith("/*")
-        ):
+        if _has_intro_comment(file.content):
             return []
 
         return [
             self.issue(
                 file=file,
                 config=config,
-                message="Start migration with a comment describing intent and expected impact.",
+                message=(
+                    "Add an introductory comment near the top describing "
+                    "migration intent and expected impact."
+                ),
             )
         ]
 
@@ -150,12 +182,16 @@ class ParseErrorRule(Rule):
         if statement.parsed:
             return []
 
-        detail = statement.parse_error or "Unknown parser error"
+        detail = (statement.parse_error or "Unknown parser error").splitlines()[0]
         return [
             self.issue(
                 file=file,
                 statement=statement,
                 config=config,
-                message=f"Statement could not be parsed by sqlglot: {detail}",
+                message=(
+                    "Failed to parse statement with sqlglot "
+                    f"(dialect='{config.dialect}'). Error: {detail}. "
+                    "Verify SQL syntax or adjust dialect in config."
+                ),
             )
         ]
