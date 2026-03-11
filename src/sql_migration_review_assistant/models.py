@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """Severity levels used by review issues."""
 
     ERROR = "error"
@@ -21,7 +21,7 @@ class Severity(str, Enum):
         return {Severity.ERROR: 3, Severity.WARNING: 2, Severity.INFO: 1}[self]
 
 
-class ReviewStatus(str, Enum):
+class ReviewStatus(StrEnum):
     """Overall status for a migration review."""
 
     PASS = "pass"

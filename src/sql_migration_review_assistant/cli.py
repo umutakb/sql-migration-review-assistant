@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 import typer
@@ -25,7 +25,7 @@ app = typer.Typer(
 console = Console()
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     TERMINAL = "terminal"
     JSON = "json"
     HTML = "html"
