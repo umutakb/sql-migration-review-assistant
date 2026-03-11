@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-migration-review-assistant"
+version = "0.1.0"
+description = "Production-grade CLI for reviewing SQL migration risks"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "SQL Migration Review Assistant Contributors" }]
+keywords = ["sql", "migration", "postgres", "cli", "risk-analysis"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+  "Topic :: Database",
+  "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+  "typer>=0.12.3,<1.0.0",
+  "pydantic>=2.7.0,<3.0.0",
+  "sqlglot>=25.0.0,<27.0.0",
+  "jinja2>=3.1.4,<4.0.0",
+  "rich>=13.7.1,<14.0.0",
+  "PyYAML>=6.0.1,<7.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0,<9.0.0",
+  "pytest-cov>=5.0.0,<6.0.0",
+  "ruff>=0.4.7,<1.0.0",
+  "black>=24.4.2,<25.0.0",
+  "mypy>=1.10.0,<2.0.0",
+  "types-PyYAML>=6.0.12.20250516,<7.0.0",
+]
+
+[project.scripts]
+smra = "sql_migration_review_assistant.cli:app"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sql_migration_review_assistant = ["templates/*.j2"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "C4", "SIM"]
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+exclude = ["tests/"]

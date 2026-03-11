@@ -1,0 +1,16 @@
+report_title: SQL Migration Review Report (Examples)
+dialect: postgres
+enabled_rules:
+  safety.description_comment_missing: true
+  safety.rollback_comment_missing: true
+severity_mapping:
+  safety.transaction_safety: warning
+fail_threshold:
+  severity: error
+  risk_score: 20
+risk_weights:
+  severity.error: 9
+  severity.warning: 3
+  severity.info: 1
+ignored_paths:
+  - archive/*.sql

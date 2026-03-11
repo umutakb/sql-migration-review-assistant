@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ bundle.input_path }} - SQL Migration Review</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #1c2630;
+      --muted: #5c6b7a;
+      --border: #dce3ea;
+      --error: #c4362a;
+      --warning: #c07a0a;
+      --info: #1f6fb2;
+      --ok: #1f7f4c;
+    }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(180deg, #f4f6f8 0%, #edf2f7 100%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 20px 40px;
+    }
+
+    .header {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    .meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .card .label {
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .card .value {
+      margin-top: 6px;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .status-pass { color: var(--ok); }
+    .status-warning { color: var(--warning); }
+    .status-fail { color: var(--error); }
+
+    .section {
+      margin-top: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(16, 24, 40, 0.04);
+    }
+
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .sev-error { color: var(--error); font-weight: 600; }
+    .sev-warning { color: var(--warning); font-weight: 600; }
+    .sev-info { color: var(--info); font-weight: 600; }
+
+    .foot {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SQL Migration Review Report</h1>
+      <div class="meta">
+        Input: <strong>{{ bundle.input_path }}</strong><br>
+        Generated: {{ bundle.generated_at }}<br>
+        Tool Version: {{ bundle.tool_version }}
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <div class="label">Status</div>
+          <div class="value status-{{ bundle.status.value }}">{{ bundle.status.value|upper }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Scanned Files</div>
+          <div class="value">{{ bundle.summary.scanned_files }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Total Statements</div>
+          <div class="value">{{ bundle.summary.total_statements }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Total Issues</div>
+          <div class="value">{{ bundle.summary.total_issues }}</div>
+        </div>
+        <div class="card">
+          <div class="label">Risk Score</div>
+          <div class="value">{{ '%.2f'|format(bundle.summary.total_risk_score) }}</div>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="label">Errors</div><div class="value sev-error">{{ bundle.summary.errors }}</div></div>
+        <div class="card"><div class="label">Warnings</div><div class="value sev-warning">{{ bundle.summary.warnings }}</div></div>
+        <div class="card"><div class="label">Info</div><div class="value sev-info">{{ bundle.summary.info }}</div></div>
+      </div>
+    </div>
+
+    <section class="section">
+      <h2>File Risk Summary</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Statements</th>
+            <th>Issues</th>
+            <th>Errors</th>
+            <th>Warnings</th>
+            <th>Info</th>
+            <th>Risk Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for file in bundle.file_summaries %}
+          <tr>
+            <td>{{ file.file_path }}</td>
+            <td>{{ file.statements }}</td>
+            <td>{{ file.issues }}</td>
+            <td class="sev-error">{{ file.errors }}</td>
+            <td class="sev-warning">{{ file.warnings }}</td>
+            <td class="sev-info">{{ file.info }}</td>
+            <td>{{ '%.2f'|format(file.risk_score) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Detailed Findings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th>
+            <th>Rule</th>
+            <th>File</th>
+            <th>Statement</th>
+            <th>Risk Weight</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for issue in bundle.issues %}
+          <tr>
+            <td class="sev-{{ issue.severity.value }}">{{ issue.severity.value|upper }}</td>
+            <td>{{ issue.rule_id }}</td>
+            <td>{{ issue.file_path }}</td>
+            <td>{{ issue.statement_index if issue.statement_index is not none else '-' }}</td>
+            <td>{{ '%.2f'|format(issue.weight) }}</td>
+            <td>{{ issue.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <div class="foot">Generated by SQL Migration Review Assistant.</div>
+  </div>
+</body>
+</html>
