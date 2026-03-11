@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from ..models import ReportBundle, ReviewIssue, ReviewStatus
+from ..models import ReportBundle, ReviewIssue, ReviewStatus, SequenceInsight
 
 
 def _status_style(status: ReviewStatus) -> str:
@@ -27,6 +27,20 @@ def _top_issues(issues: list[ReviewIssue], limit: int = 10) -> list[ReviewIssue]
             -issue.weight,
             issue.file_path,
             issue.statement_index or 0,
+        ),
+    )[:limit]
+
+
+def _top_sequence_insights(
+    insights: list[SequenceInsight], limit: int = 8
+) -> list[SequenceInsight]:
+    return sorted(
+        insights,
+        key=lambda item: (
+            -item.severity.rank,
+            -item.confidence,
+            item.kind,
+            ",".join(item.related_files),
         ),
     )[:limit]
 
@@ -57,6 +71,10 @@ def render_terminal_report(
     summary_table.add_row("Warnings", str(summary.warnings))
     summary_table.add_row("Info", str(summary.info))
     summary_table.add_row("Total Risk Score", f"{summary.total_risk_score:.2f}")
+    sequence_count = (
+        str(bundle.sequence_summary.insight_count) if bundle.sequence_summary is not None else "0"
+    )
+    summary_table.add_row("Sequence Insights", sequence_count)
     summary_table.add_row(
         "Status", f"[{_status_style(bundle.status)}]{bundle.status.value.upper()}[/]"
     )
@@ -123,3 +141,40 @@ def render_terminal_report(
         findings_table.add_row("info", "-", "-", "-", "No findings detected.")
 
     console.print(findings_table)
+
+    sequence_summary = bundle.sequence_summary
+    sequence_table = Table(title="Sequence Summary", header_style="bold")
+    sequence_table.add_column("Metric")
+    sequence_table.add_column("Value")
+    if sequence_summary is None:
+        sequence_table.add_row("Status", "Not available")
+    else:
+        sequence_table.add_row("Enabled", "yes" if sequence_summary.enabled else "no")
+        sequence_table.add_row("Ordering Strategy", sequence_summary.ordering_strategy)
+        sequence_table.add_row("Total Files", str(sequence_summary.total_files))
+        sequence_table.add_row("Touched Tables", str(sequence_summary.touched_tables))
+        sequence_table.add_row("Insights", str(sequence_summary.insight_count))
+        sequence_table.add_row("Warnings", str(sequence_summary.warning_count))
+        sequence_table.add_row("Info", str(sequence_summary.info_count))
+    console.print(sequence_table)
+
+    sequence_findings = Table(title="Top Sequence Insights", header_style="bold")
+    sequence_findings.add_column("Severity")
+    sequence_findings.add_column("Kind")
+    sequence_findings.add_column("Confidence", justify="right")
+    sequence_findings.add_column("Related Files")
+    sequence_findings.add_column("Message")
+
+    top_seq = _top_sequence_insights(bundle.sequence_insights)
+    if top_seq:
+        for insight in top_seq:
+            sequence_findings.add_row(
+                insight.severity.value,
+                insight.kind,
+                f"{insight.confidence:.2f}",
+                ", ".join(insight.related_files) or "-",
+                insight.message,
+            )
+    else:
+        sequence_findings.add_row("info", "-", "-", "-", "No sequence insights detected.")
+    console.print(sequence_findings)

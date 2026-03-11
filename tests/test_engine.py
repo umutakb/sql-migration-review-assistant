@@ -14,12 +14,19 @@ def test_engine_reviews_and_builds_bundle(fixture_dir: Path, default_config) -> 
     migrations = load_migration_files(paths, root=fixture_dir)
     parse_migrations(migrations, "postgres")
 
-    bundle = ReviewEngine().review(migrations, default_config, input_path="fixtures/risky.sql")
+    bundle = ReviewEngine().review(
+        migrations,
+        default_config,
+        input_path="fixtures/risky.sql",
+        ordering_strategy="single-file",
+    )
 
     assert bundle.summary.scanned_files == 1
     assert bundle.summary.total_statements == 4
     assert bundle.summary.total_issues > 0
     assert bundle.file_summaries[0].file_path == "risky.sql"
+    assert bundle.sequence_summary is not None
+    assert bundle.sequence_summary.enabled is False
 
 
 def test_engine_safe_file_has_non_fail_status(fixture_dir: Path, default_config) -> None:
@@ -27,7 +34,12 @@ def test_engine_safe_file_has_non_fail_status(fixture_dir: Path, default_config)
     migrations = load_migration_files(paths, root=fixture_dir)
     parse_migrations(migrations, "postgres")
 
-    bundle = ReviewEngine().review(migrations, default_config, input_path="fixtures/safe.sql")
+    bundle = ReviewEngine().review(
+        migrations,
+        default_config,
+        input_path="fixtures/safe.sql",
+        ordering_strategy="single-file",
+    )
 
     assert bundle.status.value in {"pass", "warning"}
 
@@ -39,7 +51,12 @@ def test_engine_applies_severity_override(fixture_dir: Path) -> None:
 
     config = load_config(None)
     config.severity_overrides["destructive.drop_table"] = Severity.INFO
-    bundle = ReviewEngine().review(migrations, config, input_path="fixtures/destructive.sql")
+    bundle = ReviewEngine().review(
+        migrations,
+        config,
+        input_path="fixtures/destructive.sql",
+        ordering_strategy="single-file",
+    )
 
     issue = next(item for item in bundle.issues if item.rule_id == "destructive.drop_table")
     assert issue.severity == Severity.INFO

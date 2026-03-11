@@ -23,6 +23,29 @@ DROP TABLE legacy_logs;
 TRUNCATE TABLE audit_events;
 DELETE FROM sessions;
 """,
+    "sequence_demo/20260101090000_create_orders.sql": """-- Description: create orders table
+-- Rollback: DROP TABLE orders;
+CREATE TABLE orders (
+    id BIGSERIAL PRIMARY KEY,
+    status TEXT,
+    customer_id BIGINT
+);
+""",
+    "sequence_demo/20260101091000_drop_orders_status.sql": """-- Description: drop old status column
+ALTER TABLE orders DROP COLUMN status;
+""",
+    "sequence_demo/20260101092000_add_orders_state.sql": (
+        """-- Description: add replacement state column
+ALTER TABLE orders ADD COLUMN state TEXT;
+UPDATE orders SET state = 'new' WHERE state IS NULL;
+"""
+    ),
+    "sequence_demo/20260101093000_alter_orders_state.sql": """-- Description: tighten state column
+ALTER TABLE orders ALTER COLUMN state SET NOT NULL;
+""",
+    "sequence_demo/20260101094000_drop_sessions.sql": """-- Description: cleanup sessions table
+DROP TABLE sessions;
+""",
     "config.yaml": """report_title: SQL Migration Review Report (Examples)
 dialect: postgres
 enabled_rules:

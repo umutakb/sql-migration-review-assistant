@@ -33,6 +33,8 @@ def test_json_report_generation(tmp_path: Path, fixture_dir: Path, default_confi
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["summary"]["total_issues"] >= 1
     assert payload["tool_version"]
+    assert "sequence_summary" in payload
+    assert "sequence_insights" in payload
 
 
 def test_html_report_generation(tmp_path: Path, fixture_dir: Path, default_config) -> None:
@@ -43,6 +45,8 @@ def test_html_report_generation(tmp_path: Path, fixture_dir: Path, default_confi
     html = report_path.read_text(encoding="utf-8")
     assert "SQL Migration Review Report" in html
     assert "Detailed Findings" in html
+    assert "Migration Sequence Summary" in html
+    assert "Sequence Insights" in html
 
 
 def test_report_empty_state_generation(tmp_path: Path, fixture_dir: Path, default_config) -> None:

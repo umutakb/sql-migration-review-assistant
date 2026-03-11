@@ -11,7 +11,7 @@ from rich.console import Console
 from . import __version__
 from .config import load_config
 from .engine import ReviewEngine
-from .loader import collect_sql_paths, load_migration_files
+from .loader import collect_sql_paths_with_strategy, load_migration_files
 from .models import ReviewStatus, Severity
 from .parser import parse_migrations
 from .reporters import render_terminal_report, write_html_report, write_json_report
@@ -93,7 +93,9 @@ def review(
         config.fail_threshold.severity = fail_on
 
     try:
-        sql_paths = collect_sql_paths(migrations_path, config.ignored_paths)
+        sql_paths, ordering_strategy = collect_sql_paths_with_strategy(
+            migrations_path, config.ignored_paths
+        )
     except FileNotFoundError as exc:
         _exit_with_error(str(exc), "Provide an existing .sql file or directory path.")
     except ValueError as exc:
@@ -115,7 +117,12 @@ def review(
     parse_migrations(migrations, config.dialect)
 
     engine = ReviewEngine()
-    bundle = engine.review(migrations, config=config, input_path=str(migrations_path))
+    bundle = engine.review(
+        migrations,
+        config=config,
+        input_path=str(migrations_path),
+        ordering_strategy=ordering_strategy,
+    )
     parse_error_count = sum(1 for issue in bundle.issues if issue.rule_id == "safety.parse_error")
 
     if format in {OutputFormat.TERMINAL, OutputFormat.ALL}:

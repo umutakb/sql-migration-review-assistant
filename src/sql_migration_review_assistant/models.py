@@ -96,6 +96,30 @@ class FileRiskSummary(BaseModel):
     risk_score: float
 
 
+class SequenceInsight(BaseModel):
+    """Heuristic insight derived from migration sequence analysis."""
+
+    kind: str
+    severity: Severity
+    message: str
+    related_files: list[str] = Field(default_factory=list)
+    related_tables: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+
+
+class MigrationSequenceSummary(BaseModel):
+    """Summary metadata for sequence-aware analysis."""
+
+    enabled: bool
+    ordering_strategy: str
+    total_files: int
+    touched_tables: int
+    insight_count: int
+    warning_count: int
+    info_count: int
+    ordered_files: list[str] = Field(default_factory=list)
+
+
 class ReportBundle(BaseModel):
     """All structured data for report generation."""
 
@@ -106,6 +130,8 @@ class ReportBundle(BaseModel):
     summary: ReviewSummary
     file_summaries: list[FileRiskSummary]
     issues: list[ReviewIssue]
+    sequence_summary: MigrationSequenceSummary | None = None
+    sequence_insights: list[SequenceInsight] = Field(default_factory=list)
     status: ReviewStatus
 
 

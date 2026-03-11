@@ -9,6 +9,7 @@ from .models import MigrationFile, ReportBundle, ReviewIssue, ToolConfig
 from .rules import get_default_rules
 from .rules.base import Rule
 from .scoring import build_file_summary, build_review_summary, determine_status
+from .sequence import analyze_sequence
 from .utils import utc_now
 
 
@@ -28,7 +29,11 @@ class ReviewEngine:
         self.rules = list(rules) if rules is not None else get_default_rules()
 
     def review(
-        self, files: list[MigrationFile], config: ToolConfig, input_path: str
+        self,
+        files: list[MigrationFile],
+        config: ToolConfig,
+        input_path: str,
+        ordering_strategy: str = "lexicographic",
     ) -> ReportBundle:
         issues: list[ReviewIssue] = []
         file_summaries = []
@@ -56,6 +61,7 @@ class ReviewEngine:
 
         summary = build_review_summary(files, issues, total_statements)
         status = determine_status(summary, config.fail_threshold)
+        sequence_summary, sequence_insights = analyze_sequence(files, ordering_strategy)
 
         return ReportBundle(
             tool_version=__version__,
@@ -65,5 +71,7 @@ class ReviewEngine:
             summary=summary,
             file_summaries=file_summaries,
             issues=issues,
+            sequence_summary=sequence_summary,
+            sequence_insights=sequence_insights,
             status=status,
         )

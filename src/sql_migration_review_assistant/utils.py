@@ -33,6 +33,7 @@ def write_example_files(destination: Path, overwrite: bool = False) -> list[Path
         target = destination / name
         if target.exists() and not overwrite:
             continue
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
         written_paths.append(target)
 

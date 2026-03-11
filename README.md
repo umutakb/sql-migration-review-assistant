@@ -7,6 +7,7 @@ Production-grade, PostgreSQL-focused CLI tool for reviewing SQL migration files 
 - terminal summary (Rich)
 - machine-readable JSON report
 - static HTML report (Jinja2)
+- sequence-level heuristic insights across ordered migrations (v1.2)
 
 ## Why This Project
 
@@ -40,10 +41,18 @@ First version is intentionally PostgreSQL-oriented:
   - single `.sql` file
   - directory containing `.sql` files (sorted scan)
   - ignored path patterns via config
+  - sequence-aware directory analysis with filename ordering strategies
 - Rule engine:
   - modular rule classes
   - config-driven enable/disable and severity overrides
   - improved heuristics for `DELETE` without `WHERE`, rollback/description comments, and parse errors
+- Sequence intelligence (heuristic, not full schema reconstruction):
+  - filename ordering awareness (`numeric-prefix`, `timestamp`, `lexicographic`)
+  - rename suspicion across nearby migrations
+  - create-then-index follow-up checks
+  - repeated table touch detection
+  - destructive-without-followup warnings
+  - suspicious ordering warnings
 - Risk model:
   - severity (`error`, `warning`, `info`)
   - per-issue risk weight
@@ -52,8 +61,9 @@ First version is intentionally PostgreSQL-oriented:
 - Reports:
   - Rich terminal output
   - metadata + rule breakdown in terminal output
+  - sequence summary + sequence insight list in terminal output
   - JSON report bundle
-  - static HTML report with cleaner empty states and metadata view
+  - static HTML report with sequence timeline + sequence insights
 
 ## Installation
 
@@ -67,6 +77,7 @@ pip install -e '.[dev]'
 smra version
 smra review examples/risky_migration.sql
 smra review examples/ --format all --output-dir artifacts
+smra review examples/sequence_demo --format all --output-dir artifacts
 smra init-examples
 ```
 
@@ -88,6 +99,7 @@ Behavior:
 - non-zero exit (`1`) when final status is `fail`
 - parse failures are reported as issues (`safety.parse_error`)
 - CLI prints clearer hints for invalid input path / invalid config
+- when input is a directory, sequence intelligence runs automatically
 
 ## Configuration (`config.yaml`)
 
@@ -136,6 +148,29 @@ Fail status evaluation:
 - `fail` if `total_risk_score >= fail_threshold.risk_score`
 - otherwise `warning` if any issues exist, else `pass`
 
+## Sequence Intelligence (v1.2)
+
+Sequence analysis is intentionally **heuristic** and PostgreSQL-focused. It does not build a full schema graph.
+
+What it does:
+
+- orders migration files using naming strategy detection:
+  - `timestamp` (e.g. `20260101120000_add_users.sql`)
+  - `numeric-prefix` (e.g. `001_init.sql`)
+  - fallback `lexicographic`
+- generates sequence insights with severity + confidence:
+  - `rename_suspicion`
+  - `create_then_index`
+  - `repeated_table_touch`
+  - `destructive_without_followup`
+  - `suspicious_ordering`
+
+Outputs:
+
+- terminal: sequence summary and top sequence insights
+- JSON: `sequence_summary`, `sequence_insights`
+- HTML: migration timeline + sequence insight table
+
 ## Rule Families
 
 ### A) Destructive Rules
@@ -183,6 +218,7 @@ Includes:
 - top risky files
 - rule breakdown
 - top findings
+- sequence summary and top sequence insights
 
 Example (shortened):
 
@@ -207,6 +243,8 @@ Status: FAIL
 - `summary`
 - `file_summaries`
 - `issues`
+- `sequence_summary`
+- `sequence_insights`
 - `status`
 
 ### HTML Report
@@ -219,6 +257,8 @@ Status: FAIL
 - risk score
 - file risk summary table
 - detailed findings table
+- migration sequence summary + timeline
+- sequence insights table
 - generation timestamp
 
 ## Project Structure
@@ -232,6 +272,7 @@ sql-migration-review-assistant/
     models.py
     loader.py
     parser.py
+    sequence.py
     engine.py
     scoring.py
     utils.py
@@ -261,12 +302,19 @@ sql-migration-review-assistant/
     test_rules_schema_changes.py
     test_rules_performance.py
     test_rules_safety.py
+    test_sequence.py
     test_reporters.py
     test_cli.py
   examples/
     safe_migration.sql
     risky_migration.sql
     destructive_migration.sql
+    sequence_demo/
+      20260101090000_create_orders.sql
+      20260101091000_drop_orders_status.sql
+      20260101092000_add_orders_state.sql
+      20260101093000_alter_orders_state.sql
+      20260101094000_drop_sessions.sql
     config.yaml
   .github/workflows/ci.yml
   README.md
@@ -295,6 +343,7 @@ CI runs:
 - `examples/risky_migration.sql`
 - `examples/destructive_migration.sql`
 - `examples/config.yaml`
+- `examples/sequence_demo/*.sql`
 
 Also bootstrap examples into your current folder:
 
